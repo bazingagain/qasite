@@ -1,18 +1,17 @@
-from django.shortcuts import render
-from django.http import HttpResponse
-from gensim import models
-from qasite.app.word2vec.docvecmodel import Doc2Vec
-from qasite.app.qa.models import QAPair,UserQAPair
-from qasite.app.classifier.naivebayes import bayesclassifier
+import django
 import json
-from numpy import *
-from .utils import *
-import os
-import mysql.connector
-import os,django
 import logging
+import os
+
 from django.conf import settings
 from django.core.cache import cache
+from django.http import HttpResponse
+from django.shortcuts import render
+from gensim import models
+from numpy import *
+from qasite.app.classifier.naivebayes import bayesclassifier
+from qasite.app.qa.models import QAPair,UserQAPair
+from qasite.app.word2vec.bean.doc2vec import Doc2Vec
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "qasite.settings")
 django.setup()
@@ -62,6 +61,7 @@ def train(request):
 def ask(request):
     """
     用户获取答案
+    #Django模式 https://segmentfault.com/q/1010000004204037/a-1020000004205900
     :param request:
     :return:
     """
@@ -69,28 +69,29 @@ def ask(request):
     if request.method == 'GET':
         ask = request.GET.get('ask')
         if ask is None:return resp({'status':'error', 'answer':'ask is None'})
-        # TODO  将模型改为一次加载模式,常驻内存
-        # https://segmentfault.com/q/1010000004204037/a-1020000004205900
-        pwd = __file__
-        modelfile = os.path.join(os.path.abspath(os.path.dirname(pwd) + os.path.sep + "../"),
-                                 "word2vec/model/med250.model.bin")
-        wordmodel = models.Word2Vec.load(modelfile)
-        docmodel = Doc2Vec(wordmodel)
-
-        classifier = bayesclassifier.BayesClassifier()
-        classifier.trainNB()
+        classifier = cache.get('classifier')
+        if classifier is None:
+            classifier = bayesclassifier.BayesClassifier()
+            classifier.trainOrLoadNB()
+            cache.set('classifier', classifier)
+        docmodel = cache.get('docmodel')
+        if docmodel is None:
+            docmodel = Doc2Vec(None)
+            cache.set('docmodel', docmodel)
+        vec = docmodel.query(ask)
+        if vec is None:
+            return resp({'status': 'success', 'answer': '不知道你在说什么', 'similarity': -1.0})
         # 1. 对问题进行分类,找到该问题属于哪个问题,通过朴素贝叶斯
-        senvec = mat(docmodel.query(ask))
-        classLabel = classifier.predict(senvec)
+        senvec = mat(vec)
+        classLabel = classifier.predict(senvec)[0]
         logging.info(classLabel)
-        entrys = QAPair.objects.filter(classLabel=classLabel[0])
+        entrys = QAPair.objects.filter(classLabel=classLabel)
         # 2. 从该分类中通过使用word2vec的模型,找到最相近的问题,并返回其答案
         boost = 0.5
         answer = None
         maxSimilarity = float(-1)
         for e in entrys:
             similarity = docmodel.similarity(e.question, ask)
-            logging.info(e.question)
             if similarity > boost:
                 boost = similarity
                 maxSimilarity = similarity
@@ -105,11 +106,6 @@ def asktest(request):
         ask = request.GET.get('ask')
         return resp({'status':'success', 'answer':'寻找答案中...'})
         if ask is None:return resp({'status':'error', 'msg':'ask is None'})
-
-
-def testCache(request):
-    cache.get(key)
-    cache.set(key, json.dumps("value"),settings.NEVER_REDIS_TIMEOUT)
 
 
 

@@ -1,7 +1,10 @@
+import logging
+
 from django.test import TestCase
 from gensim import models
-from qasite.app.word2vec.docvecmodel import Doc2Vec
-import logging
+
+from qasite.app.word2vec.bean.doc2vec import Doc2Vec
+
 
 class Word2VecTest(TestCase):
     def test_laod_word2vec_model(self):

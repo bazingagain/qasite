@@ -89,10 +89,10 @@ DATABASES = {
 
 CACHES = {
     'default': {
-        'BACKEND': 'redis_cache.cache.RedisCache',
-        'LOCATION': '127.0.0.1:6379',
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379',
         "OPTIONS": {
-            "CLIENT_CLASS": "redis_cache.client.DefaultClient",
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
     },
 }
@@ -146,3 +146,6 @@ STATICFILES_DIRS = (
     ("js", os.path.join(STATIC_ROOT,'js')),
     ("images", os.path.join(STATIC_ROOT,'images')),
 )
+
+QAPAIR_VEC_FILE = os.path.join(BASE_DIR, 'data/train/qapair_vec.txt')
+WORD2VEC_MODEL_FILE = os.path.join(BASE_DIR, 'data/model/word2vec/med250.model.bin')
